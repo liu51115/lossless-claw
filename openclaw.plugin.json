@@ -119,6 +119,10 @@
     "fallbackProviders": {
       "label": "Fallback Providers",
       "help": "Explicit fallback provider/model pairs for compaction summarization (e.g., [{\"provider\": \"anthropic\", \"model\": \"claude-haiku-4-5\"}])"
+    },
+    "pinnedFiles": {
+      "label": "Pinned Files",
+      "help": "Workspace files always present in context (never compacted). Paths relative to agent workspace."
     }
   },
   "configSchema": {
@@ -269,6 +273,11 @@
         "type": "number",
         "minimum": 0,
         "maximum": 1
+      },
+      "pinnedFiles": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Workspace-relative file paths injected into every context assembly, outside the compaction DAG. These files are never summarized."
       }
     }
   }
