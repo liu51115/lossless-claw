@@ -479,4 +479,65 @@ describe("resolveLcmConfig", () => {
     expect(config.summaryMaxOverageFactor).toBe(2.5);
     expect(config.maxAssemblyTokenBudget).toBe(16000);
   });
+
+  it("auto-tunes thresholds for opus model when not explicitly set", () => {
+    const config = resolveLcmConfig({} as NodeJS.ProcessEnv, {
+      modelId: "anthropic/claude-opus-4-6",
+    });
+    expect(config.modelId).toBe("anthropic/claude-opus-4-6");
+    expect(config.leafSkipReductionThreshold).toBe(0.08);
+    expect(config.leafBudgetHeadroomFactor).toBe(0.85);
+  });
+
+  it("auto-tunes thresholds for haiku/cheap model", () => {
+    const config = resolveLcmConfig({} as NodeJS.ProcessEnv, {
+      modelId: "anthropic/claude-haiku-4-5-20251001",
+    });
+    expect(config.leafSkipReductionThreshold).toBe(0.03);
+    expect(config.leafBudgetHeadroomFactor).toBe(0.75);
+  });
+
+  it("uses standard defaults for sonnet model", () => {
+    const config = resolveLcmConfig({} as NodeJS.ProcessEnv, {
+      modelId: "anthropic/claude-sonnet-4-6",
+    });
+    expect(config.leafSkipReductionThreshold).toBe(0.05);
+    expect(config.leafBudgetHeadroomFactor).toBe(0.80);
+  });
+
+  it("uses standard defaults for unknown model", () => {
+    const config = resolveLcmConfig({} as NodeJS.ProcessEnv, {
+      modelId: "some-unknown-model",
+    });
+    expect(config.leafSkipReductionThreshold).toBe(0.05);
+    expect(config.leafBudgetHeadroomFactor).toBe(0.80);
+  });
+
+  it("explicit threshold overrides model-based auto-config", () => {
+    const config = resolveLcmConfig({} as NodeJS.ProcessEnv, {
+      modelId: "anthropic/claude-opus-4-6",
+      leafSkipReductionThreshold: 0.02,
+      leafBudgetHeadroomFactor: 0.70,
+    });
+    expect(config.leafSkipReductionThreshold).toBe(0.02);
+    expect(config.leafBudgetHeadroomFactor).toBe(0.70);
+  });
+
+  it("env var LCM_MODEL_ID overrides plugin config modelId", () => {
+    const config = resolveLcmConfig(
+      { LCM_MODEL_ID: "anthropic/claude-haiku-4-5-20251001" } as unknown as NodeJS.ProcessEnv,
+      { modelId: "anthropic/claude-opus-4-6" },
+    );
+    expect(config.modelId).toBe("anthropic/claude-haiku-4-5-20251001");
+    expect(config.leafSkipReductionThreshold).toBe(0.03);
+    expect(config.leafBudgetHeadroomFactor).toBe(0.75);
+  });
+
+  it("auto-tunes for openrouter model paths", () => {
+    const config = resolveLcmConfig({} as NodeJS.ProcessEnv, {
+      modelId: "openrouter/google/gemini-2.5-flash",
+    });
+    expect(config.leafSkipReductionThreshold).toBe(0.03);
+    expect(config.leafBudgetHeadroomFactor).toBe(0.75);
+  });
 });

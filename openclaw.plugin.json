@@ -127,6 +127,10 @@
     "pinnedFilesPerAgent": {
       "label": "Per-Agent Pinned Files",
       "help": "Agent-specific pinned files keyed by agent ID. Merged with global pinnedFiles."
+    },
+    "modelId": {
+      "label": "Agent Model ID",
+      "help": "Model ID of the agent (e.g., 'anthropic/claude-opus-4-6'). Auto-tunes compaction guard thresholds based on model pricing tier."
     }
   },
   "configSchema": {
@@ -290,6 +294,10 @@
           "items": { "type": "string" }
         },
         "description": "Per-agent pinned file paths, keyed by agent ID. Merged with global pinnedFiles at resolution time."
+      },
+      "modelId": {
+        "description": "Model ID of the agent (e.g., 'anthropic/claude-opus-4-6'). Auto-tunes leafSkipReductionThreshold and leafBudgetHeadroomFactor based on model pricing tier when those fields are not explicitly set.",
+        "type": "string"
       }
     }
   }

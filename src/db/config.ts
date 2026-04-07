@@ -66,6 +66,11 @@ export type LcmConfig = {
   /** Skip leaf compaction when assembled tokens < factor × contextThreshold × tokenBudget.
    *  Avoids unnecessary compaction when there is ample budget headroom. Default 0.8. */
   leafBudgetHeadroomFactor: number;
+  /** Model ID of the agent using this LCM instance (e.g. "anthropic/claude-opus-4-6").
+   *  Used to auto-tune leafSkipReductionThreshold and leafBudgetHeadroomFactor
+   *  based on model pricing tier when those fields are not explicitly set.
+   *  Set via plugin config: plugins.entries.lossless-claw.config.modelId */
+  modelId: string;
 };
 
 /** Safely coerce an unknown value to a finite number, or return undefined. */
@@ -183,6 +188,7 @@ export function resolveLcmConfig(
   pluginConfig?: Record<string, unknown>,
 ): LcmConfig {
   const pc = pluginConfig ?? {};
+  const resolvedModelId = env.LCM_MODEL_ID?.trim() || toStr(pc.modelId) || "";
   const resolvedLeafChunkTokens =
     parseFiniteInt(env.LCM_LEAF_CHUNK_TOKENS)
       ?? toNumber(pc.leafChunkTokens) ?? 20000;
@@ -302,15 +308,76 @@ export function resolveLcmConfig(
         ?? toFallbackProviderArray(pc.fallbackProviders) ?? [],
     leafSkipReductionThreshold: clamp01(
       parseFiniteNumber(env.LCM_LEAF_SKIP_REDUCTION_THRESHOLD)
-        ?? toNumber(pc.leafSkipReductionThreshold) ?? 0.05,
+        ?? toNumber(pc.leafSkipReductionThreshold)
+        ?? getModelPricingDefaults(resolvedModelId).leafSkipReductionThreshold,
     ),
     leafBudgetHeadroomFactor: clamp01(
       parseFiniteNumber(env.LCM_LEAF_BUDGET_HEADROOM_FACTOR)
-        ?? toNumber(pc.leafBudgetHeadroomFactor) ?? 0.8,
+        ?? toNumber(pc.leafBudgetHeadroomFactor)
+        ?? getModelPricingDefaults(resolvedModelId).leafBudgetHeadroomFactor,
     ),
+    modelId: resolvedModelId,
   };
 }
 
 function clamp01(value: number): number {
   return Math.min(Math.max(value, 0), 1);
+}
+
+// ---------------------------------------------------------------------------
+// Model-aware pricing defaults
+// ---------------------------------------------------------------------------
+
+type ModelPricingDefaults = {
+  leafSkipReductionThreshold: number;
+  leafBudgetHeadroomFactor: number;
+};
+
+/**
+ * Per-token pricing tiers (input $/MTok, cached $/MTok) used to determine
+ * optimal compaction guard thresholds. A higher cache-miss cost means we
+ * should set a higher leafSkipReductionThreshold (require a bigger win
+ * before invalidating the cache prefix).
+ */
+const MODEL_TIER_TABLE: Array<[pattern: string, tier: "expensive" | "standard" | "cheap"]> = [
+  // Anthropic direct
+  ["anthropic/claude-opus-4", "expensive"],
+  ["anthropic/claude-sonnet-4", "standard"],
+  ["anthropic/claude-haiku-4", "cheap"],
+  // OpenRouter Anthropic
+  ["openrouter/anthropic/claude-opus-4", "expensive"],
+  ["openrouter/anthropic/claude-sonnet-4", "standard"],
+  // OpenRouter Google
+  ["openrouter/google/gemini-2.5-pro", "standard"],
+  ["openrouter/google/gemini-2.5-flash", "cheap"],
+  // OpenRouter DeepSeek
+  ["openrouter/deepseek/deepseek-v3", "cheap"],
+  // Bare model names (fallback matching)
+  ["claude-opus-4", "expensive"],
+  ["claude-sonnet-4", "standard"],
+  ["claude-haiku-4", "cheap"],
+  ["gemini-2.5-pro", "standard"],
+  ["gemini-2.5-flash", "cheap"],
+  ["deepseek-v3", "cheap"],
+];
+
+const TIER_DEFAULTS: Record<"expensive" | "standard" | "cheap", ModelPricingDefaults> = {
+  // Opus: cache miss ~$0.68 — high bar before invalidating cache prefix
+  expensive: { leafSkipReductionThreshold: 0.08, leafBudgetHeadroomFactor: 0.85 },
+  // Sonnet: moderate cost — use library defaults
+  standard: { leafSkipReductionThreshold: 0.05, leafBudgetHeadroomFactor: 0.80 },
+  // Haiku/cheap: cache miss ~$0.14 — lower bar, compact more aggressively
+  cheap: { leafSkipReductionThreshold: 0.03, leafBudgetHeadroomFactor: 0.75 },
+};
+
+/** Returns optimal compaction guard thresholds based on the agent's model pricing tier. */
+export function getModelPricingDefaults(modelId: string | undefined): ModelPricingDefaults {
+  if (!modelId) return TIER_DEFAULTS.standard;
+  const lower = modelId.toLowerCase();
+  for (const [pattern, tier] of MODEL_TIER_TABLE) {
+    if (lower.startsWith(pattern) || lower.includes(pattern)) {
+      return TIER_DEFAULTS[tier];
+    }
+  }
+  return TIER_DEFAULTS.standard;
 }
