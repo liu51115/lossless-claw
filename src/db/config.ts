@@ -189,9 +189,10 @@ export function resolveLcmConfig(
 ): LcmConfig {
   const pc = pluginConfig ?? {};
   const resolvedModelId = env.LCM_MODEL_ID?.trim() || toStr(pc.modelId) || "";
+  const modelDefaults = getModelPricingDefaults(resolvedModelId);
   const resolvedLeafChunkTokens =
     parseFiniteInt(env.LCM_LEAF_CHUNK_TOKENS)
-      ?? toNumber(pc.leafChunkTokens) ?? 20000;
+      ?? toNumber(pc.leafChunkTokens) ?? modelDefaults.leafChunkTokens;
   const resolvedBootstrapMaxTokens =
     parseFiniteInt(env.LCM_BOOTSTRAP_MAX_TOKENS)
       ?? toNumber(pc.bootstrapMaxTokens)
@@ -231,7 +232,7 @@ export function resolveLcmConfig(
         : toBool(pc.skipStatelessSessions) ?? true,
     contextThreshold:
       parseFiniteNumber(env.LCM_CONTEXT_THRESHOLD)
-        ?? toNumber(pc.contextThreshold) ?? 0.75,
+        ?? toNumber(pc.contextThreshold) ?? modelDefaults.contextThreshold,
     freshTailCount:
       parseFiniteInt(env.LCM_FRESH_TAIL_COUNT)
         ?? toNumber(pc.freshTailCount) ?? 64,
@@ -309,12 +310,12 @@ export function resolveLcmConfig(
     leafSkipReductionThreshold: clamp01(
       parseFiniteNumber(env.LCM_LEAF_SKIP_REDUCTION_THRESHOLD)
         ?? toNumber(pc.leafSkipReductionThreshold)
-        ?? getModelPricingDefaults(resolvedModelId).leafSkipReductionThreshold,
+        ?? modelDefaults.leafSkipReductionThreshold,
     ),
     leafBudgetHeadroomFactor: clamp01(
       parseFiniteNumber(env.LCM_LEAF_BUDGET_HEADROOM_FACTOR)
         ?? toNumber(pc.leafBudgetHeadroomFactor)
-        ?? getModelPricingDefaults(resolvedModelId).leafBudgetHeadroomFactor,
+        ?? modelDefaults.leafBudgetHeadroomFactor,
     ),
     modelId: resolvedModelId,
   };
@@ -331,6 +332,8 @@ function clamp01(value: number): number {
 type ModelPricingDefaults = {
   leafSkipReductionThreshold: number;
   leafBudgetHeadroomFactor: number;
+  contextThreshold: number;
+  leafChunkTokens: number;
 };
 
 /**
@@ -363,11 +366,12 @@ const MODEL_TIER_TABLE: Array<[pattern: string, tier: "expensive" | "standard" |
 
 const TIER_DEFAULTS: Record<"expensive" | "standard" | "cheap", ModelPricingDefaults> = {
   // Opus: cache miss ~$0.68 — high bar before invalidating cache prefix
-  expensive: { leafSkipReductionThreshold: 0.08, leafBudgetHeadroomFactor: 0.85 },
+  // leafChunkTokens 35K = fewer big passes worth the cache cost
+  expensive: { leafSkipReductionThreshold: 0.08, leafBudgetHeadroomFactor: 0.85, contextThreshold: 0.75, leafChunkTokens: 35000 },
   // Sonnet: moderate cost — use library defaults
-  standard: { leafSkipReductionThreshold: 0.05, leafBudgetHeadroomFactor: 0.80 },
+  standard: { leafSkipReductionThreshold: 0.05, leafBudgetHeadroomFactor: 0.80, contextThreshold: 0.75, leafChunkTokens: 20000 },
   // Haiku/cheap: cache miss ~$0.14 — lower bar, compact more aggressively
-  cheap: { leafSkipReductionThreshold: 0.03, leafBudgetHeadroomFactor: 0.75 },
+  cheap: { leafSkipReductionThreshold: 0.03, leafBudgetHeadroomFactor: 0.75, contextThreshold: 0.75, leafChunkTokens: 8000 },
 };
 
 /** Returns optimal compaction guard thresholds based on the agent's model pricing tier. */
