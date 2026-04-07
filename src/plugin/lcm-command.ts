@@ -592,6 +592,13 @@ async function buildStatusText(params: {
 
   // Health section (only when current conversation is available)
   if (current.kind === "resolved") {
+    const conversationDoctor =
+      doctor.byConversation.get(current.stats.conversationId) ?? {
+        total: 0,
+        old: 0,
+        truncated: 0,
+        fallback: 0,
+      };
     const health = getCompactionHealthStats(params.db, current.stats.conversationId);
     const freshTailConfig = params.config.freshTailCount ?? 64;
     const summaryModel = params.config.summaryModel;
