@@ -13,11 +13,11 @@ describe("resolveLcmConfig", () => {
     expect(config.ignoreSessionPatterns).toEqual([]);
     expect(config.statelessSessionPatterns).toEqual([]);
     expect(config.skipStatelessSessions).toBe(true);
-    expect(config.contextThreshold).toBe(0.75);
+    expect(config.contextThreshold).toBe(0.90);
     expect(config.freshTailCount).toBe(64);
     expect(config.newSessionRetainDepth).toBe(2);
     expect(config.incrementalMaxDepth).toBe(1);
-    expect(config.leafChunkTokens).toBe(20000);
+    expect(config.leafChunkTokens).toBe(80000);
     expect(config.leafMinFanout).toBe(8);
     expect(config.condensedMinFanout).toBe(4);
     expect(config.condensedMinFanoutHard).toBe(2);
@@ -146,7 +146,7 @@ describe("resolveLcmConfig", () => {
       newSessionRetainDepth: "nope",
       enabled: "maybe",
     });
-    expect(config.contextThreshold).toBe(0.75); // falls through to default
+    expect(config.contextThreshold).toBe(0.90); // falls through to default
     expect(config.freshTailCount).toBe(64); // falls through to default
     expect(config.newSessionRetainDepth).toBe(2); // falls through to default
     expect(config.enabled).toBe(true); // falls through to default
@@ -357,16 +357,16 @@ describe("resolveLcmConfig", () => {
   });
   it("defaults summaryMaxOverageFactor to 3 and maxAssemblyTokenBudget to undefined", () => {
     const config = resolveLcmConfig({}, {});
-    expect(config.bootstrapMaxTokens).toBe(6000);
+    expect(config.bootstrapMaxTokens).toBe(24000);
     expect(config.delegationTimeoutMs).toBe(120000);
     expect(config.summaryMaxOverageFactor).toBe(3);
     expect(config.maxAssemblyTokenBudget).toBeUndefined();
   });
 
-  it("defaults leafSkipReductionThreshold to 0.05 and leafBudgetHeadroomFactor to 0.8", () => {
+  it("defaults leafSkipReductionThreshold to 0.15 and leafBudgetHeadroomFactor to 0.95", () => {
     const config = resolveLcmConfig({}, {});
-    expect(config.leafSkipReductionThreshold).toBe(0.05);
-    expect(config.leafBudgetHeadroomFactor).toBe(0.8);
+    expect(config.leafSkipReductionThreshold).toBe(0.15);
+    expect(config.leafBudgetHeadroomFactor).toBe(0.95);
   });
 
   it("reads leafSkipReductionThreshold and leafBudgetHeadroomFactor from plugin config", () => {
@@ -485,32 +485,32 @@ describe("resolveLcmConfig", () => {
       modelId: "anthropic/claude-opus-4-6",
     });
     expect(config.modelId).toBe("anthropic/claude-opus-4-6");
-    expect(config.leafSkipReductionThreshold).toBe(0.08);
-    expect(config.leafBudgetHeadroomFactor).toBe(0.85);
+    expect(config.leafSkipReductionThreshold).toBe(0.10);
+    expect(config.leafBudgetHeadroomFactor).toBe(0.95);
   });
 
   it("auto-tunes thresholds for haiku/cheap model", () => {
     const config = resolveLcmConfig({} as NodeJS.ProcessEnv, {
       modelId: "anthropic/claude-haiku-4-5-20251001",
     });
-    expect(config.leafSkipReductionThreshold).toBe(0.03);
-    expect(config.leafBudgetHeadroomFactor).toBe(0.75);
+    expect(config.leafSkipReductionThreshold).toBe(0.25);
+    expect(config.leafBudgetHeadroomFactor).toBe(0.90);
   });
 
   it("uses standard defaults for sonnet model", () => {
     const config = resolveLcmConfig({} as NodeJS.ProcessEnv, {
       modelId: "anthropic/claude-sonnet-4-6",
     });
-    expect(config.leafSkipReductionThreshold).toBe(0.05);
-    expect(config.leafBudgetHeadroomFactor).toBe(0.80);
+    expect(config.leafSkipReductionThreshold).toBe(0.15);
+    expect(config.leafBudgetHeadroomFactor).toBe(0.95);
   });
 
   it("uses standard defaults for unknown model", () => {
     const config = resolveLcmConfig({} as NodeJS.ProcessEnv, {
       modelId: "some-unknown-model",
     });
-    expect(config.leafSkipReductionThreshold).toBe(0.05);
-    expect(config.leafBudgetHeadroomFactor).toBe(0.80);
+    expect(config.leafSkipReductionThreshold).toBe(0.15);
+    expect(config.leafBudgetHeadroomFactor).toBe(0.95);
   });
 
   it("explicit threshold overrides model-based auto-config", () => {
@@ -529,15 +529,15 @@ describe("resolveLcmConfig", () => {
       { modelId: "anthropic/claude-opus-4-6" },
     );
     expect(config.modelId).toBe("anthropic/claude-haiku-4-5-20251001");
-    expect(config.leafSkipReductionThreshold).toBe(0.03);
-    expect(config.leafBudgetHeadroomFactor).toBe(0.75);
+    expect(config.leafSkipReductionThreshold).toBe(0.25);
+    expect(config.leafBudgetHeadroomFactor).toBe(0.90);
   });
 
   it("auto-tunes for openrouter model paths", () => {
     const config = resolveLcmConfig({} as NodeJS.ProcessEnv, {
       modelId: "openrouter/google/gemini-2.5-flash",
     });
-    expect(config.leafSkipReductionThreshold).toBe(0.03);
-    expect(config.leafBudgetHeadroomFactor).toBe(0.75);
+    expect(config.leafSkipReductionThreshold).toBe(0.25);
+    expect(config.leafBudgetHeadroomFactor).toBe(0.90);
   });
 });

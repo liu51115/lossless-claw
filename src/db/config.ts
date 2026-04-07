@@ -365,13 +365,14 @@ const MODEL_TIER_TABLE: Array<[pattern: string, tier: "expensive" | "standard" |
 ];
 
 const TIER_DEFAULTS: Record<"expensive" | "standard" | "cheap", ModelPricingDefaults> = {
-  // Opus: cache miss ~$0.68 — high bar before invalidating cache prefix
-  // leafChunkTokens 35K = fewer big passes worth the cache cost
-  expensive: { leafSkipReductionThreshold: 0.08, leafBudgetHeadroomFactor: 0.85, contextThreshold: 0.75, leafChunkTokens: 35000 },
-  // Sonnet: moderate cost — use library defaults
-  standard: { leafSkipReductionThreshold: 0.05, leafBudgetHeadroomFactor: 0.80, contextThreshold: 0.75, leafChunkTokens: 20000 },
-  // Haiku/cheap: cache miss ~$0.14 — lower bar, compact more aggressively
-  cheap: { leafSkipReductionThreshold: 0.03, leafBudgetHeadroomFactor: 0.75, contextThreshold: 0.75, leafChunkTokens: 8000 },
+  // Opus: cache miss ~$2.59 at 150K prefix (P × (cache_write - cache_read))
+  // Minimize compaction events — each one costs more in cache penalty than it saves
+  expensive: { leafSkipReductionThreshold: 0.10, leafBudgetHeadroomFactor: 0.95, contextThreshold: 0.90, leafChunkTokens: 80000 },
+  // Sonnet: cache miss ~$0.52 — still significant, conservative compaction
+  standard: { leafSkipReductionThreshold: 0.15, leafBudgetHeadroomFactor: 0.95, contextThreshold: 0.90, leafChunkTokens: 80000 },
+  // Haiku: cache miss ~$0.14, but Sonnet compaction cost ($0.28) exceeds it
+  // Use smaller chunks to reduce per-pass cost; slightly lower headroom for safety
+  cheap: { leafSkipReductionThreshold: 0.25, leafBudgetHeadroomFactor: 0.90, contextThreshold: 0.90, leafChunkTokens: 40000 },
 };
 
 /** Returns optimal compaction guard thresholds based on the agent's model pricing tier. */
